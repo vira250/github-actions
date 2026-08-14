@@ -8,6 +8,6 @@ public class HelloController {
 
     @GetMapping("/welcome")
     public String welcome(){
-        return "Hello from github Actions";
+        return "Hello India";
     }
 }
