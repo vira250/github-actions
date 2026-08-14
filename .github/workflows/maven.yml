@@ -3,10 +3,7 @@ name: Demo
 on:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
 
-# Required for Maven dependency submission
 permissions:
   contents: write
 
@@ -26,7 +23,10 @@ jobs:
           cache: maven
 
       - name: Build with Maven
-        run: mvn clean install
+        run: mvn --batch-mode clean install
+
+      - name: Test Maven dependency tree
+        run: mvn --batch-mode dependency:tree
 
       - name: Update dependency graph
         uses: advanced-security/maven-dependency-submission-action@v5
