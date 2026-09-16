@@ -64,7 +64,7 @@ jobs:
       - name: Initialize CodeQL Analysis
         uses: github/codeql-action/init@v3
         with:
-          languages: 'java'
+          languages: 'java-kotlin'
 
       - name: Set up JDK 17 for CodeQL Build
         uses: actions/setup-java@v4
