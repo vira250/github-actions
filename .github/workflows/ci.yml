@@ -33,10 +33,10 @@ jobs:
           cache: 'maven'
 
       - name: Build project artifacts
-        run: mvn clean package -DskipTests
+        run: ./mvnw clean package -DskipTests
 
       - name: Run automated tests (JUnit)
-        run: mvn test
+        run: ./mvnw test
 
   security-scan:
     name: Security & Vulnerability Scan
@@ -54,6 +54,8 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:java"
 
   deploy:
     name: Deployment
