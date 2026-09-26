@@ -64,8 +64,11 @@ jobs:
     needs: [build-and-test, security-scan]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
       - name: Deploy application
         env:
-          DEPLOY_BRANCH: ${{ github.ref }}
+          TARGET_BRANCH: ${{ github.ref }}
         run: |
-          echo "Deploying application to target environment from branch: $DEPLOY_BRANCH"
+          echo "Deploying application to target environment from branch: $TARGET_BRANCH"
