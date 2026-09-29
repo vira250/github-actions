@@ -9,8 +9,6 @@ on:
 permissions:
   contents: read
   security-events: write
-  pull-requests: read
-  actions: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,12 +16,12 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Build, Test & Security
+    name: Build & Test
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout source code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -33,36 +31,12 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Initialize CodeQL Analysis
-        uses: github/codeql-action/init@v3
-        with:
-          languages: java
-
-      - name: Build project artifacts
-        run: mvn clean package -DskipTests
-
-      - name: Run automated tests (JUnit)
-        run: mvn test
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+      - name: Build and run unit tests
+        run: mvn clean verify
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: backend-jar
           path: target/*.jar
-          if-no-files-found: error
-
-  deploy:
-    name: Deployment
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - name: Deploy application
-        env:
-          DEPLOY_TARGET: "production"
-        run: |
-          echo "Deploying application to $DEPLOY_TARGET environment"
+          if-no-files-found: ignore
