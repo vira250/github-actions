@@ -2,33 +2,27 @@ name: Java CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
-      - master
-      - main-secondary
+    branches: [main, master, main-secondary]
   pull_request:
-    branches:
-      - main
-      - master
-      - main-secondary
+    branches: [main, master, main-secondary]
   workflow_dispatch:
 
 permissions:
   contents: read
   security-events: write
   packages: write
-  pull-requests: read
-  actions: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build, Test & Package
+  build-test-and-push:
+    name: Build, Test, and Push Docker Image
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository }}
 
     steps:
       - name: Checkout source code
@@ -41,8 +35,11 @@ jobs:
           java-version: '17'
           cache: 'maven'
 
-      - name: Build and run unit tests
-        run: mvn clean package
+      - name: Build project artifacts
+        run: mvn clean package -DskipTests
+
+      - name: Run automated tests
+        run: mvn test
 
       - name: Upload Application JAR Artifact
         uses: actions/upload-artifact@v4
@@ -52,10 +49,20 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Initialize CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        continue-on-error: true
+
       - name: Create Dockerfile if not present
         run: |
           if [ ! -f Dockerfile ]; then
-          cat > Dockerfile << 'DEOF'
+            cat > Dockerfile << 'DEOF'
           FROM eclipse-temurin:17-jre-jammy
           WORKDIR /app
           COPY target/*.jar app.jar
@@ -67,46 +74,23 @@ jobs:
       - name: Verify JAR artifact exists
         run: ls -la target/*.jar
 
-      - name: Set Short SHA
-        id: vars
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Log in to GitHub Container Registry
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ secrets.PLATFORM_GHCR_USERNAME }}
-          password: ${{ secrets.PLATFORM_GHCR_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          provenance: false
           tags: |
-            ghcr.io/vira250/github-actions:${{ github.sha }}
-            ghcr.io/vira250/github-actions:${{ steps.vars.outputs.sha_short }}
-            ghcr.io/vira250/github-actions:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:latest
+          provenance: false
 
-  security-scan:
-    name: Security & Vulnerability Scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      security-events: write
-
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL Analysis
-        uses: github/codeql-action/init@v3
-        with:
-          languages: java
-          build-mode: none
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        continue-on-error: true
+      - name: Trigger Deployment
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: echo "Deploying application to target environment"
