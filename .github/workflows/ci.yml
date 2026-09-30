@@ -24,39 +24,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build & Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'maven'
-
-      - name: Build project artifacts
-        run: mvn clean package -DskipTests
-
-      - name: Run automated tests (JUnit)
-        run: mvn test
-
-      - name: Upload Application JAR Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: application-jar
-          path: "**/target/*.jar"
-          if-no-files-found: warn
-          retention-days: 30
-
   security-scan:
-    name: Security & Vulnerability Scan
+    name: Security & CodeQL Analysis
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -71,12 +43,51 @@ jobs:
         uses: github/codeql-action/analyze@v3
         continue-on-error: true
 
-  deploy:
-    name: Deployment
-    needs: [build-and-test]
+  build-and-test:
+    name: Build, Test & Package
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
     steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Build project artifacts
+        run: mvn clean compile
+
+      - name: Run automated tests
+        run: mvn test
+
+      - name: Package application JAR
+        run: mvn package -DskipTests
+
+      - name: Upload Application JAR Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-jar
+          path: "**/target/*.jar"
+          if-no-files-found: warn
+          retention-days: 30
+
+  deploy:
+    name: Deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [build-and-test, security-scan]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/main-secondary')
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
       - name: Deploy application
-        run: echo "Deploying application to target environment"
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
+        run: echo "Deploying application to target environment for branch ${TARGET_BRANCH}"
