@@ -91,6 +91,6 @@ jobs:
             ${{ env.IMAGE_NAME }}:latest
           provenance: false
 
-      - name: Trigger Deployment
+      - name: Deploy application
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: echo "Deploying application to target environment"
