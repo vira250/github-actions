@@ -57,11 +57,11 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
-          cache: 'maven'
+          cache: maven
 
-      - name: Build and run automated tests
+      - name: Build project and run tests
         run: mvn clean package
 
       - name: Upload Application JAR Artifact
