@@ -11,7 +11,7 @@ public class CicdGithubActionsApplication {
 
 	@GetMapping("/welcome")
 	public String welcome(){
-		return "Hello ALL Members of Logic Lords";
+		return "Hello terna";
 	}
 	public static void main(String[] args) {
 		SpringApplication.run(CicdGithubActionsApplication.class, args);
