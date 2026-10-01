@@ -65,7 +65,7 @@ jobs:
       - name: Create Dockerfile if not present
         run: |
           if [ ! -f Dockerfile ]; then
-          cat > Dockerfile << 'DEOF'
+            cat > Dockerfile << 'DEOF'
           FROM eclipse-temurin:17-jre-jammy
           WORKDIR /app
           COPY target/*.jar app.jar
