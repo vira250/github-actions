@@ -9,9 +9,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class CicdGithubActionsApplication {
 
-	@GetMapping("/welcome")
-	public String welcome(){
-		return "Hello terna";
+		@GetMapping("/")
+		public String home() {
+			return "<h1>🚀 Hello from CI/CD Platform!</h1><p>Application successfully deployed via Docker & Cloudflare Tunnel.</p>";
+
 	}
 	public static void main(String[] args) {
 		SpringApplication.run(CicdGithubActionsApplication.class, args);
