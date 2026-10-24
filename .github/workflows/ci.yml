@@ -2,29 +2,57 @@ name: Java CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, master, main-secondary ]
+    branches:
+      - main
+      - master
+      - main-secondary
   pull_request:
-    branches: [ main, master, main-secondary ]
+    branches:
+      - main
+      - master
+      - main-secondary
   workflow_dispatch:
 
 permissions:
   contents: read
   security-events: write
   packages: write
+  pull-requests: read
+  actions: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build & Test
+  security-scan:
+    name: CodeQL Vulnerability Scan
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
     steps:
-      - name: Checkout repository
+      - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Initialize CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        continue-on-error: true
+
+  build-test-publish:
+    name: Build, Test, and Package Application
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Make Maven wrapper executable
+        run: chmod +x ./mvnw || true
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -33,58 +61,51 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build and package JAR
+      - name: Build project artifacts
         run: mvn clean package -DskipTests
 
-      - name: Run unit tests
-        run: mvn test || true
+      - name: Run automated tests (JUnit)
+        run: mvn test
 
-      - name: Upload Executable JAR Artifact
+      - name: Upload Application JAR Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: backend-jar
+          name: application-jar
           path: "**/target/*.jar"
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Verify JAR artifact exists
-        run: ls -la target/*.jar 2>/dev/null || ls -la build/libs/*.jar 2>/dev/null || true
-
       - name: Create Dockerfile if not present
         run: |
           if [ ! -f Dockerfile ]; then
-          cat > Dockerfile << 'DEOF'
-          FROM eclipse-temurin:21-jre-jammy
+            cat > Dockerfile << 'DEOF'
+          FROM eclipse-temurin:17-jre-jammy
           WORKDIR /app
           COPY target/*.jar app.jar
-          COPY build/libs/*.jar app.jar
           EXPOSE 8080
           ENTRYPOINT ["java", "-jar", "app.jar"]
           DEOF
-          if [ ! -d target ]; then
-            sed -i '/COPY target/d' Dockerfile
           fi
-          if [ ! -d build/libs ]; then
-            sed -i '/COPY build/d' Dockerfile
-          fi
-          fi
+
+      - name: Verify JAR artifact exists
+        run: ls -la target/*.jar
 
       - name: Lowercase image name for GHCR
         run: echo "IMAGE_NAME=ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      - name: Login to GitHub Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image to GHCR
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
-          provenance: false
+          push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.IMAGE_NAME }}:latest
+          provenance: false
