@@ -17,6 +17,6 @@ public class HomeController {
     }
     @GetMapping("/hello")
     public String hello() {
-        return "<h1>🚀 Hello Raj!</h1><p>Application successfully deployed via Docker & Cloudflare Tunnel.</p>";
+        return "<h1>🚀 Hello Devang!</h1><p>Application successfully deployed via Docker & Cloudflare Tunnel.</p>";
     }
 }
