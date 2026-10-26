@@ -17,60 +17,65 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build & Test
+  build-and-deploy:
+    name: Build, Test, and Publish
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout repository
+      - name: Checkout source code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
           cache: 'maven'
 
-      - name: Build and package JAR
+      - name: Build project artifacts
         run: mvn clean package -DskipTests
 
-      - name: Run unit tests
-        run: mvn test || true
+      - name: Run automated tests
+        run: mvn test
 
-      - name: Upload Executable JAR Artifact
+      - name: Upload Application JAR Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: backend-jar
+          name: application-jar
           path: "**/target/*.jar"
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Initialize CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        continue-on-error: true
+
       - name: Verify JAR artifact exists
-        run: ls -la target/*.jar 2>/dev/null || ls -la build/libs/*.jar 2>/dev/null || true
+        run: ls -la target/*.jar
 
       - name: Create Dockerfile if not present
         run: |
           if [ ! -f Dockerfile ]; then
           cat > Dockerfile << 'DEOF'
-          FROM eclipse-temurin:21-jre-jammy
+          FROM eclipse-temurin:17-jre-jammy
           WORKDIR /app
           COPY target/*.jar app.jar
-          COPY build/libs/*.jar app.jar
           EXPOSE 8080
           ENTRYPOINT ["java", "-jar", "app.jar"]
           DEOF
-          if [ ! -d target ]; then
-            sed -i '/COPY target/d' Dockerfile
-          fi
-          if [ ! -d build/libs ]; then
-            sed -i '/COPY build/d' Dockerfile
-          fi
           fi
 
       - name: Lowercase image name for GHCR
-        run: echo "IMAGE_NAME=ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+        run: |
+          REPO_NAME="${{ github.repository }}"
+          echo "IMAGE_NAME=ghcr.io/$(echo $REPO_NAME | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -79,7 +84,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image to GHCR
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
